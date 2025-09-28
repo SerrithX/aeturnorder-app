@@ -322,7 +322,7 @@ const onDraw = () => {
 
 
       {/* Controls */}
-      <div className="px-4 pt-1 pb-1 bg-slate-900/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+      <div className="px-4 pt-1 pb-6 bg-slate-900/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
         <div className="max-w-[600px] mx-auto">
           {/* Top row: Draw, Undo, Shuffle */}
           <div className="grid grid-cols-3 gap-3">
