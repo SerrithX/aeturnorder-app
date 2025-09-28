@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import { initPWA } from "./pwa";
 
 /* Vite base path: '/' in dev, '/aeturnorder-app/' on GitHub Pages */
 const BASE = import.meta.env.BASE_URL;
@@ -41,6 +42,10 @@ function cardSrcFor(kind) {
   }
 }
 
+function vibrate(ms = 25) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+}
+
 /* ---------- app ---------- */
 
 export default function App() {
@@ -60,6 +65,19 @@ export default function App() {
   // simple undo stack of previous states
   const historyRef = useRef([]);
 
+  // PWA update banner
+  const [updateReady, setUpdateReady] = useState(false);
+
+  useEffect(() => {
+    initPWA((confirmReload) => {
+      // Show the banner
+      setUpdateReady(true);
+      // Save the reload function so the button can call it
+      window.__doUpdate = confirmReload;
+    });
+  }, []);
+
+
   const pushHistory = () => {
     historyRef.current.push(JSON.parse(JSON.stringify(state)));
     if (historyRef.current.length > 50) historyRef.current.shift();
@@ -72,9 +90,17 @@ export default function App() {
       return;
     }
 
+    // after confirming there's a card to draw
+    vibrate(25);
+
+    // top of deck is the last element in your array
     const next = state.deck[state.deck.length - 1];
     const newDeck = state.deck.slice(0, -1);
-    const newDiscard = [next, ...state.discard];
+
+    // move the *previous* current card to discard (if there was one)
+    const newDiscard = state.lastDraw
+      ? [state.lastDraw, ...state.discard]
+      : state.discard;
 
     pushHistory();
     setIsAnimating(true);
@@ -85,7 +111,7 @@ export default function App() {
         ...s,
         deck: newDeck,
         discard: newDiscard,
-        lastDraw: next,
+        lastDraw: next, // keep the new one as the CURRENT card
         message: `${labelFor(next.kind)}'s turn.`,
       }));
       setIsCardVisible(true);
@@ -126,9 +152,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
       {/* Card area */}
-      <div className="flex-1 flex items-center justify-center px-4 pt-4">
+      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-4">
+        {/* Card frame */}
         <div className="w-full max-w-[600px] aspect-[63/88] shadow-xl overflow-hidden">
-          <div className={`w-full h-full transition-opacity duration-200 ${isCardVisible ? "opacity-100" : "opacity-0"}`}>
+          <div
+            className={`w-full h-full transition-opacity duration-200 ${
+              isCardVisible ? "opacity-100" : "opacity-0"
+            }`}
+          >
             {state.lastDraw ? (
               <img
                 src={cardSrcFor(state.lastDraw.kind)}
@@ -148,7 +179,27 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* NEW: Cards left (below card, full width) */}
+        <div className="mt-3 text-center text-sm sm:text-base text-slate-300">
+            Cards left:{" "}
+            <span className="font-semibold text-slate-100">{remaining}</span>
+        </div>
+
+        {/* Update banner (unchanged) */}
+        {updateReady && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-amber-500 text-black px-4 py-2 rounded-xl shadow-lg flex items-center gap-3 z-[9999]">
+            <span>Update available</span>
+            <button
+              className="px-3 py-1 rounded-lg bg-black text-white"
+              onClick={() => window.__doUpdate?.()}
+            >
+              Reload
+            </button>
+          </div>
+        )}
       </div>
+
 
       {/* Controls */}
       <div className="px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+16px)] bg-slate-900/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
