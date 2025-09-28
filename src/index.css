@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Global fantasy font */
+html, body, #root { font-family: "Cinzel", serif; }
