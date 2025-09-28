@@ -42,9 +42,10 @@ function cardSrcFor(kind) {
   }
 }
 
-function vibrate(ms = 25) {
-  try { if (navigator.vibrate) navigator.vibrate(ms); } catch {}
+function vibrate(pattern = 25) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
 }
+
 
 /* ---------- app ---------- */
 
@@ -58,21 +59,22 @@ export default function App() {
     message: "Tap Draw to start.",
   }));
 
-  // fade controls
-  const [isCardVisible, setIsCardVisible] = useState(true);
+  // animation control
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // simple undo stack of previous states
+  // NEW: slide + flip states (for the two-layer card animation)
+  const [nextCard, setNextCard] = useState(null);   // holds upcoming card during animation
+  const [slideOut, setSlideOut] = useState(false);  // top card slides right when true
+  const [underAngle, setUnderAngle] = useState(0);  // bottom card rotation in degrees
+
+  // history
   const historyRef = useRef([]);
 
   // PWA update banner
   const [updateReady, setUpdateReady] = useState(false);
-
   useEffect(() => {
     initPWA((confirmReload) => {
-      // Show the banner
       setUpdateReady(true);
-      // Save the reload function so the button can call it
       window.__doUpdate = confirmReload;
     });
   }, []);
@@ -83,41 +85,133 @@ export default function App() {
     if (historyRef.current.length > 50) historyRef.current.shift();
   };
 
-  const onDraw = () => {
-    if (isAnimating) return;
-    if (state.deck.length === 0) {
-      setState((s) => ({ ...s, message: "Deck empty. Tap Shuffle to start next round." }));
-      return;
-    }
+  // disables the top card transition when we snap it back to center
+  const [topInstant, setTopInstant] = useState(false);
 
-    // after confirming there's a card to draw
-    vibrate(25);
+  // hide top card (instantly) so the first draw’s flip is visible underneath
+  const [hideTop, setHideTop] = useState(false);
 
-    // top of deck is the last element in your array
-    const next = state.deck[state.deck.length - 1];
-    const newDeck = state.deck.slice(0, -1);
+const SLIDE_MS = 250; // keep in sync with duration-250 on the top layer
+const FLIP_MS  = 300; // keep in sync with duration-300 on the bottom (flip) layer
 
-    // move the *previous* current card to discard (if there was one)
-    const newDiscard = state.lastDraw
-      ? [state.lastDraw, ...state.discard]
-      : state.discard;
+const onDraw = () => {
+  if (isAnimating) return;
 
-    pushHistory();
-    setIsAnimating(true);
-    setIsCardVisible(false);
+  if (state.deck.length === 0) {
+    setState((s) => ({ ...s, message: "Deck empty. Tap Shuffle to start next round." }));
+    return;
+  }
 
+  // compute next card & piles up front
+  const next = state.deck[state.deck.length - 1];
+  const newDeck = state.deck.slice(0, -1);
+  const newDiscard = state.lastDraw ? [state.lastDraw, ...state.discard] : state.discard;
+
+  // haptics
+  if (next.kind === 'NEM') vibrate([40, 60, 40]); else vibrate(25);
+
+  pushHistory();
+  setIsAnimating(true);
+
+  const firstDraw = state.lastDraw === null;
+
+  // Prep bottom: start at 180° so BACK faces the viewer
+  setNextCard(next);
+  setUnderAngle(180);
+
+  if (firstDraw) {
+    // ---------- FIRST DRAW: FLIP ONLY ----------
+    // Hide the top back instantly so the flip is visible underneath
+    setTopInstant(true);
+    setHideTop(true);
+    requestAnimationFrame(() => setTopInstant(false)); // restore transitions for later
+
+    // small tick to ensure the 180° state paints
     setTimeout(() => {
+      // update piles before reveal
       setState((s) => ({
         ...s,
         deck: newDeck,
         discard: newDiscard,
-        lastDraw: next, // keep the new one as the CURRENT card
-        message: `${labelFor(next.kind)}'s turn.`,
+        message: `${labelFor(next.kind)} is coming up…`,
       }));
-      setIsCardVisible(true);
-      setTimeout(() => setIsAnimating(false), 180);
-    }, 180);
-  };
+
+      // flip BACK (180) -> FRONT (360)
+      setUnderAngle(360);
+
+      // ----- END of FIRST DRAW branch (different ending) -----
+      setTimeout(() => {
+        // snap top visible (no transitions) so it doesn't animate in
+        setTopInstant(true);
+        setHideTop(false);
+
+        // now mount the new face
+        setState((s) => ({
+          ...s,
+          lastDraw: next,
+          message: `${labelFor(next.kind)}'s turn.`,
+        }));
+
+        // cleanup
+        setNextCard(null);
+        setUnderAngle(0);
+        setIsAnimating(false);
+
+        // re-enable transitions after snap has painted
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTopInstant(false);
+          });
+        });
+      }, FLIP_MS);
+    }, 20);
+
+  } else {
+    // ---------- NORMAL DRAWS: SLIDE THEN FLIP ----------
+    // 1) slide the current face off-screen
+    setSlideOut(true);
+
+    // after slide completes…
+    setTimeout(() => {
+      // update piles
+      setState((s) => ({
+        ...s,
+        deck: newDeck,
+        discard: newDiscard,
+        message: `${labelFor(next.kind)} is coming up…`,
+      }));
+
+      // 2) flip bottom BACK (180) -> FRONT (360)
+      setUnderAngle(360);
+
+      // ----- END of NORMAL branch (different ending) -----
+      setTimeout(() => {
+        // snap top back to center *without* transitions BEFORE mounting new face
+        setTopInstant(true);
+        setSlideOut(false);
+
+        // now mount the new face and clear anim bits
+        setState((s) => ({
+          ...s,
+          lastDraw: next,
+          message: `${labelFor(next.kind)}'s turn.`,
+        }));
+        setNextCard(null);
+        setUnderAngle(0);
+        setIsAnimating(false);
+
+        // re-enable transitions after the snap has painted (double RAF = robust on desktop)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTopInstant(false);
+          });
+        });
+      }, FLIP_MS);
+    }, SLIDE_MS);
+  }
+};
+
+
 
   const onUndo = () => {
     if (isAnimating) return;
@@ -140,6 +234,11 @@ export default function App() {
       lastDraw: null,
       message: `Round ${s.round + 1} started. Tap Draw.`,
     }));
+    // Reset animation bits
+    setNextCard(null);
+    setSlideOut(false);
+    setUnderAngle(0);
+    setHideTop(false);
   };
 
   const onToggleDiscards = () => {
@@ -155,30 +254,51 @@ export default function App() {
       <div className="flex-1 flex flex-col items-center justify-start px-4 pt-4">
         {/* Card frame */}
         <div className="w-full max-w-[600px] aspect-[63/88] shadow-xl overflow-hidden">
-          <div
-            className={`w-full h-full transition-opacity duration-200 ${
-              isCardVisible ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {state.lastDraw ? (
+          <div className="relative w-full h-full [perspective:1000px]">
+            {/* BOTTOM: “next” card (double-sided). Visible while nextCard is set */}
+            <div
+              className={`absolute inset-0 ${nextCard ? 'block' : 'hidden'} 
+                          transform-gpu [transform-style:preserve-3d] transition-transform duration-300 ease-in-out [will-change:transform]`}
+              style={{ transform: `rotateY(${underAngle % 360}deg)` }}
+            >
+              {/* FRONT of bottom = the NEXT card face */}
               <img
-                src={cardSrcFor(state.lastDraw.kind)}
-                alt={labelFor(state.lastDraw.kind)}
-                className="w-full h-full object-cover"
+                key={nextCard ? nextCard.id : 'none'}
+                src={nextCard ? cardSrcFor(nextCard.kind) : `${BASE}cards/card-back.webp`}
+                alt={nextCard ? labelFor(nextCard.kind) : 'Deck back'}
+                className="absolute inset-0 w-full h-full object-cover [backface-visibility:hidden]"
                 loading="eager"
                 decoding="async"
               />
-            ) : (
+              {/* BACK of bottom = card back */}
               <img
                 src={`${BASE}cards/card-back.webp`}
-                alt="Deck back"
-                className="w-full h-full object-cover"
+                alt="Card back"
+                className="absolute inset-0 w-full h-full object-cover [backface-visibility:hidden] [transform:rotateY(180deg)]"
                 loading="eager"
                 decoding="async"
               />
-            )}
+            </div>
+
+            {/* TOP: current face-up card that slides away */}
+              <div
+                className={`absolute inset-0 will-change-transform ${
+                  topInstant ? 'transition-none' : 'transition-transform duration-250 ease-out'
+                } ${slideOut ? 'translate-x-full' : 'translate-x-0'} ${hideTop ? 'opacity-0' : 'opacity-100'}`}
+              >
+
+              <img
+                key={state.lastDraw ? state.lastDraw.id : 'back'}
+                src={state.lastDraw ? cardSrcFor(state.lastDraw.kind) : `${BASE}cards/card-back.webp`}
+                alt={state.lastDraw ? labelFor(state.lastDraw.kind) : 'Deck back'}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
           </div>
         </div>
+
 
         {/* NEW: Cards left (below card, full width) */}
         <div className="mt-3 text-center text-sm sm:text-base text-slate-300">
