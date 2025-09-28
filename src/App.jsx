@@ -249,7 +249,7 @@ const onDraw = () => {
   const remaining = state.deck.length;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col overflow-hidden">
       {/* Card area */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 pt-4">
         {/* Card frame */}
@@ -301,7 +301,7 @@ const onDraw = () => {
 
 
         {/* NEW: Cards left (below card, full width) */}
-        <div className="mt-3 text-center text-sm sm:text-base text-slate-300">
+        <div className="mt-1 mb-1 text-center text-sm sm:text-base text-slate-300">
             Cards left:{" "}
             <span className="font-semibold text-slate-100">{remaining}</span>
         </div>
