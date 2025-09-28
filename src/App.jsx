@@ -46,6 +46,21 @@ function vibrate(pattern = 25) {
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch {}
 }
 
+function preloadImages(urls, onProgress) {
+  const total = urls.length;
+  let loaded = 0;
+  const tick = () => onProgress(++loaded / total);
+
+  return Promise.all(
+    urls.map((url) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = img.onerror = () => { tick(); resolve(); };
+      img.src = url;
+    }))
+  );
+}
+
+
 
 /* ---------- app ---------- */
 
@@ -62,6 +77,12 @@ export default function App() {
   // animation control
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // Splash / preload
+  const [bootProgress, setBootProgress] = useState(0); // 0..1
+  const [bootDone, setBootDone] = useState(false);     // assets preloaded
+  const [begun, setBegun] = useState(false);           // user tapped Begin
+
+
   // NEW: slide + flip states (for the two-layer card animation)
   const [nextCard, setNextCard] = useState(null);   // holds upcoming card during animation
   const [slideOut, setSlideOut] = useState(false);  // top card slides right when true
@@ -77,7 +98,26 @@ export default function App() {
       setUpdateReady(true);
       window.__doUpdate = confirmReload;
     });
+
+    // Preload card images so first animations are smooth
+    const urls = [
+      `${BASE}cards/card-back.webp`,
+      `${BASE}cards/card-p1.webp`,
+      `${BASE}cards/card-p2.webp`,
+      `${BASE}cards/card-nemesis.webp`,
+    ];
+
+    let mounted = true;
+    (async () => {
+      await preloadImages(urls, (p) => mounted && setBootProgress(p));
+      // small buffer so it doesn't jump from 99→100 instantly
+      await new Promise((r) => setTimeout(r, 150));
+      if (mounted) setBootDone(true);
+    })();
+
+    return () => { mounted = false; };
   }, []);
+
 
 
   const pushHistory = () => {
@@ -250,6 +290,36 @@ const onDraw = () => {
 
   return (
     <div className="min-h-[100svh] bg-slate-900 text-slate-100 flex flex-col overflow-hidden overscroll-none pt-[max(env(safe-area-inset-top),10px)] pb-[max(env(safe-area-inset-bottom),10px)]">
+      
+      {/* Splash overlay */}
+      {!begun && (
+        <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center px-6">
+          <div className="w-full max-w-xs text-center">
+            {!bootDone ? (
+              <>
+                <div className="mb-3 text-sm text-neutral-300">Loading…</div>
+                <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-neutral-300 transition-[width] duration-150"
+                    style={{ width: `${Math.round(bootProgress * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-neutral-400">
+                  {Math.round(bootProgress * 100)}%
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setBegun(true)}
+                className="w-full py-4 rounded-xl bg-gradient-to-b from-neutral-700 to-neutral-900 text-neutral-200 border border-neutral-500 ring-1 ring-neutral-400/20 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:from-neutral-600 hover:to-neutral-800 active:translate-y-px tracking-wide font-semibold"
+              >
+                Begin
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Card area */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 mb-2">
         {/* Card frame */}
@@ -327,8 +397,8 @@ const onDraw = () => {
           {/* Top row: Draw, Undo, Shuffle */}
           <div className="grid grid-cols-3 gap-3">
             <button
-              onClick={onDraw}
-              disabled={isAnimating}
+              onClick={onDraw} 
+              disabled={isAnimating || !begun}   
               title={isAnimating ? "Animating…" : "Draw"}
               className="py-4 rounded-xl bg-gradient-to-b from-violet-600/90 to-indigo-800/90 border border-violet-300/50 shadow-[0_6px_18px_rgba(0,0,0,0.55)] ring-1 ring-violet-200/30 hover:from-violet-500 hover:to-indigo-700 active:translate-y-px text-amber-100 tracking-wide font-extrabold"
             >
@@ -337,7 +407,7 @@ const onDraw = () => {
 
             <button
               onClick={onUndo}
-              disabled={historyRef.current.length === 0 || isAnimating}
+              disabled={historyRef.current.length === 0 || isAnimating || !begun}   
               title={historyRef.current.length === 0 ? "Nothing to undo" : "Undo"}
               className="py-4 rounded-xl bg-gradient-to-b from-slate-700/90 to-slate-900/90 border border-slate-300/30 shadow-[0_6px_18px_rgba(0,0,0,0.55)] ring-1 ring-slate-200/20 hover:from-slate-600 hover:to-slate-800 active:translate-y-px text-slate-100 tracking-wide font-semibold disabled:opacity-50"
             >
@@ -346,8 +416,8 @@ const onDraw = () => {
 
             <button
               onClick={onShuffle}
-              disabled={isAnimating}
-              title={isAnimating ? "Animating…" : "Shuffle"}
+              disabled={isAnimating || !begun}
+              title={isAnimating ? "Animating…" : "Shuffle"}   
               className="py-4 rounded-xl bg-gradient-to-b from-emerald-600/90 to-teal-800/90 border border-emerald-300/50 shadow-[0_6px_18px_rgba(0,0,0,0.55)] ring-1 ring-emerald-200/30 hover:from-emerald-500 hover:to-teal-700 active:translate-y-px text-amber-100 tracking-wide font-extrabold"
             >
               Shuffle
@@ -358,7 +428,7 @@ const onDraw = () => {
           <div className="mt-3">
             <button
               onClick={onToggleDiscards}
-              disabled={isAnimating}
+              disabled={isAnimating || !begun} 
               className="w-full py-4 rounded-xl bg-gradient-to-b from-neutral-700 to-neutral-900 text-neutral-200 border border-neutral-500 ring-1 ring-neutral-400/20 shadow-[0_4px_12px_rgba(0,0,0,0.5)] hover:from-neutral-600 hover:to-neutral-800 active:translate-y-px tracking-wide font-semibold"
             >
               {state.showDiscards ? "Hide Discards" : "Display Discards"}
