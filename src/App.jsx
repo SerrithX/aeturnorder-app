@@ -249,9 +249,9 @@ const onDraw = () => {
   const remaining = state.deck.length;
 
   return (
-    <div className="min-h-[100svh] bg-slate-900 text-slate-100 flex flex-col overflow-hidden">
+    <div className="min-h-[100svh] bg-slate-900 text-slate-100 flex flex-col overflow-hidden pt-[max(env(safe-area-inset-top),10px)] pb-[max(env(safe-area-inset-bottom),10px)]">
       {/* Card area */}
-      <div className="flex-1 flex flex-col items-center justify-start px-4 pt-2">
+      <div className="flex-1 flex flex-col items-center justify-start px-4 mb-2">
         {/* Card frame */}
         <div className="w-full max-w-[600px] aspect-[63/88] shadow-xl overflow-hidden">
           <div className="relative w-full h-full [perspective:1000px]">
@@ -322,7 +322,7 @@ const onDraw = () => {
 
 
       {/* Controls */}
-      <div className="px-4 pt-2 pb-[env(safe-area-inset-bottom)] bg-slate-900/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
+      <div className="px-4 pt-1 pb-1 bg-slate-900/90 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
         <div className="max-w-[600px] mx-auto">
           {/* Top row: Draw, Undo, Shuffle */}
           <div className="grid grid-cols-3 gap-3">
