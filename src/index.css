@@ -2,3 +2,10 @@
 
 /* Global fantasy font */
 html, body, #root { font-family: "Cinzel", serif; }
+
+/* Disable page-level pull-to-refresh / bounce */
+@layer base {
+  html, body {
+    overscroll-behavior-y: none;
+  }
+}

@@ -249,7 +249,7 @@ const onDraw = () => {
   const remaining = state.deck.length;
 
   return (
-    <div className="min-h-[100svh] bg-slate-900 text-slate-100 flex flex-col overflow-hidden pt-[max(env(safe-area-inset-top),10px)] pb-[max(env(safe-area-inset-bottom),10px)]">
+    <div className="min-h-[100svh] bg-slate-900 text-slate-100 flex flex-col overflow-hidden overscroll-none pt-[max(env(safe-area-inset-top),10px)] pb-[max(env(safe-area-inset-bottom),10px)]">
       {/* Card area */}
       <div className="flex-1 flex flex-col items-center justify-start px-4 mb-2">
         {/* Card frame */}
