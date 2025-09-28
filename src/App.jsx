@@ -1,5 +1,8 @@
 import React, { useRef, useState } from "react";
 
+/* Vite base path: '/' in dev, '/aeturnorder-app/' on GitHub Pages */
+const BASE = import.meta.env.BASE_URL;
+
 /* ---------- helpers ---------- */
 
 function shuffle(array) {
@@ -31,115 +34,28 @@ function labelFor(kind) {
 
 function cardSrcFor(kind) {
   switch (kind) {
-    case "P1": return "/cards/card-p1.webp";
-    case "P2": return "/cards/card-p2.webp";
-    case "NEM": return "/cards/card-nemesis.webp";
-    default:   return "/cards/card-back.webp";
+    case "P1": return `${BASE}cards/card-p1.webp`;
+    case "P2": return `${BASE}cards/card-p2.webp`;
+    case "NEM": return `${BASE}cards/card-nemesis.webp`;
+    default:   return `${BASE}cards/card-back.webp`;
   }
 }
 
 /* ---------- app ---------- */
 
 export default function App() {
-  const [state, setState] = useState(() => ({
-    round: 1,
-    deck: shuffle(makeBaseDeck()),
-    discard: [],
-    lastDraw: null,
-    showDiscards: false,
-    message: "Tap Draw to start.",
-  }));
-
-  // fade controls
-  const [isCardVisible, setIsCardVisible] = useState(true);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  // simple undo stack of previous states
-  const historyRef = useRef([]);
-
-  const pushHistory = () => {
-    historyRef.current.push(JSON.parse(JSON.stringify(state)));
-    if (historyRef.current.length > 50) historyRef.current.shift();
-  };
-
-  const onDraw = () => {
-    if (isAnimating) return; // ignore spam during fade
-    if (state.deck.length === 0) {
-      setState((s) => ({ ...s, message: "Deck empty. Tap Shuffle to start next round." }));
-      return;
-    }
-
-    // Prepare next values first so timing doesn’t race with state
-    const next = state.deck[state.deck.length - 1];
-    const newDeck = state.deck.slice(0, -1);
-    const newDiscard = [next, ...state.discard];
-
-    pushHistory();
-    setIsAnimating(true);
-    setIsCardVisible(false); // fade out
-    // After fade-out, swap the card + fade in
-    setTimeout(() => {
-      setState((s) => ({
-        ...s,
-        deck: newDeck,
-        discard: newDiscard,
-        lastDraw: next,
-        message: `${labelFor(next.kind)}'s turn.`,
-      }));
-      setIsCardVisible(true); // fade in
-      // give the fade-in a beat before re-enabling clicks
-      setTimeout(() => setIsAnimating(false), 180);
-    }, 180); // keep these in sync with duration-200 (close enough)
-  };
-
-  const onUndo = () => {
-    if (isAnimating) return;
-    const prev = historyRef.current.pop();
-    if (!prev) {
-      setState((s) => ({ ...s, message: "Nothing to undo." }));
-      return;
-    }
-    setState(prev);
-  };
-
-  const onShuffle = () => {
-    if (isAnimating) return;
-    pushHistory();
-    setState((s) => ({
-      ...s,
-      round: s.round + 1,
-      deck: shuffle(makeBaseDeck()),
-      discard: [],
-      lastDraw: null,
-      message: `Round ${s.round + 1} started. Tap Draw.`,
-    }));
-  };
-
-  const onToggleDiscards = () => {
-    if (isAnimating) return;
-    setState((s) => ({ ...s, showDiscards: !s.showDiscards }));
-  };
-
-  const remaining = state.deck.length;
+  // ... your state/handlers stay the same ...
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
       {/* Card area */}
       <div className="flex-1 flex items-center justify-center px-4 pt-4">
-        <div className="w-full max-w-[600px] aspect-[63/88] shadow-x1 overflow-hidden">
+        <div className="w-full max-w-[600px] aspect-[63/88] shadow-xl overflow-hidden">
           {/* Fade wrapper */}
-          <div
-            className={`w-full h-full transition-opacity duration-200 ${isCardVisible ? "opacity-100" : "opacity-0"}`}
-          >
+          <div className={`w-full h-full transition-opacity duration-200 ${isCardVisible ? "opacity-100" : "opacity-0"}`}>
             {state.lastDraw ? (
               <img
-                src={
-                  state.lastDraw.kind === "P1"
-                    ? "/cards/card-p1.webp"
-                    : state.lastDraw.kind === "P2"
-                    ? "/cards/card-p2.webp"
-                    : "/cards/card-nemesis.webp"
-                }
+                src={cardSrcFor(state.lastDraw.kind)}
                 alt={labelFor(state.lastDraw.kind)}
                 className="w-full h-full object-cover"
                 loading="eager"
@@ -147,7 +63,7 @@ export default function App() {
               />
             ) : (
               <img
-                src="/cards/card-back.webp"
+                src={`${BASE}cards/card-back.webp`}   {/* <-- use BASE here */}
                 alt="Deck back"
                 className="w-full h-full object-cover"
                 loading="eager"
