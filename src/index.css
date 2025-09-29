@@ -1,11 +1,36 @@
 @import "tailwindcss";
 
 /* Global fantasy font */
-html, body, #root { font-family: "Cinzel", serif; }
+html, body, #root { 
+  font-family: "Cinzel", serif; 
+}
 
 /* Disable page-level pull-to-refresh / bounce */
 @layer base {
   html, body {
     overscroll-behavior-y: none;
+  }
+}
+
+/* Card shuffle jitter animation */
+@layer utilities {
+  @keyframes card-jitter {
+    0%, 100% { transform: translate(0,0) rotate(0); opacity: 1; }
+
+    15% { transform: translate(-2px, 0) rotate(-0.5deg); }
+    30% { transform: translate(2px, 0) rotate(0.5deg); }
+    45% { transform: translate(-1px, 0) rotate(-0.3deg); }
+
+    /* Fade fully out */
+    55% { transform: translate(1px, 0) rotate(0.3deg); opacity: 0; }
+    /* Hold black screen */
+    75% { transform: translate(-1px, 0) rotate(-0.2deg); opacity: 0; }
+
+    /* Start fading back in */
+    90% { transform: translate(1px, 0) rotate(0.2deg); opacity: 0.6; }
+  }
+
+  .animate-card-jitter {
+    animation: card-jitter 1200ms ease-in-out;
   }
 }

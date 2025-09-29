@@ -76,6 +76,8 @@ export default function App() {
 
   // animation control
   const [isAnimating, setIsAnimating] = useState(false);
+  const [shuffleFX, setShuffleFX] = useState(false);
+
 
   // Splash / preload
   const [bootProgress, setBootProgress] = useState(0); // 0..1
@@ -263,23 +265,49 @@ const onDraw = () => {
     setState(prev);
   };
 
-  const onShuffle = () => {
-    if (isAnimating) return;
-    pushHistory();
+// put these near your other constants
+const SHUFFLE_FX_MS = 1200;           // match .animate-card-jitter duration
+const SHUFFLE_SWITCH_AT = 750;        // when it's black (55–75%), swap decks
+
+const onShuffle = () => {
+  if (isAnimating) return;
+
+  // Start the visual effect on the card stack
+  setShuffleFX(true);
+
+  // Lock out other actions during the FX
+  setIsAnimating(true);
+
+  // While it's black, do the real shuffle switch
+  const switchTimer = setTimeout(() => {
+    // Build fresh deck and clear piles while user can't see it
+    const nextRound = (state.round ?? 1) + 1;
+
     setState((s) => ({
       ...s,
-      round: s.round + 1,
+      round: nextRound,
       deck: shuffle(makeBaseDeck()),
       discard: [],
-      lastDraw: null,
-      message: `Round ${s.round + 1} started. Tap Draw.`,
+      lastDraw: null, // ← so we fade back in to the BACK image
+      message: `Round ${nextRound} started. Tap Draw.`,
     }));
-    // Reset animation bits
+
+    // Reset any draw-animation bits (safe to do while hidden)
     setNextCard(null);
     setSlideOut(false);
     setUnderAngle(0);
     setHideTop(false);
-  };
+  }, SHUFFLE_SWITCH_AT);
+
+  // End of animation: unlock & clear the FX flag
+  const endTimer = setTimeout(() => {
+    setShuffleFX(false);
+    setIsAnimating(false);
+  }, SHUFFLE_FX_MS);
+
+};
+
+
 
   const onToggleDiscards = () => {
     if (isAnimating) return;
@@ -324,7 +352,7 @@ const onDraw = () => {
       <div className="flex-1 flex flex-col items-center justify-start px-4 mb-2">
         {/* Card frame */}
         <div className="w-full max-w-[600px] aspect-[63/88] shadow-xl overflow-hidden">
-          <div className="relative w-full h-full [perspective:1000px]">
+          <div className={`relative w-full h-full [perspective:1000px] ${shuffleFX ? 'animate-card-jitter' : ''}`}>
             {/* BOTTOM: “next” card (double-sided). Visible while nextCard is set */}
             <div
               className={`absolute inset-0 ${nextCard ? 'block' : 'hidden'} 
