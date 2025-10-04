@@ -9,26 +9,36 @@ export default defineConfig({
     react(),
       VitePWA({
         registerType: 'autoUpdate',
-        workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
-        },
         includeAssets: [
-          'cards/*.webp',          // public/cards/...
-          'icons/*.png',           // public/icons/...
-          // remove 'apple-touch-icon.png' if it's inside /icons
-          // add it only if you also have public/apple-touch-icon.png at the root
+          'favicon.ico',
+          'robots.txt',
+          'icons/*.png',
+          'icons/*.svg',
+          'cards/*.webp'
         ],
         manifest: {
-          // ...
-          start_url: '/aeturnorder-app/',
+          name: 'Random Turn Generator',
+          short_name: 'RTG',
+          description: 'Turn order deck: P1 - P6 / Enemy',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
+          display: 'standalone',
           scope: '/aeturnorder-app/',
+          start_url: '/aeturnorder-app/',
           icons: [
-            { src: '/aeturnorder-app/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/aeturnorder-app/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-            { src: '/aeturnorder-app/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-          ],
+            { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+            { src: 'icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+            { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          ]
         },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+          navigateFallback: '/aeturnorder-app/index.html',
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true
+        }
       })
-
   ],
 })
