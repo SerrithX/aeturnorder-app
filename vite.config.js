@@ -9,9 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: "Aeon's End Turn Order",
-        short_name: 'AETurn',
-        description: 'Turn order deck: P1 / P2 / Nemesis',
+        name: "Random Turn Generator",
+        short_name: 'RTG',
+        description: 'Turn order deck: P1 - P6 / Enemy',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
