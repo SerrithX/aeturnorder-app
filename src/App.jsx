@@ -3,6 +3,26 @@ import React, { useRef, useState } from "react";
 /* Vite base path: '/' in dev, '/aeturnorder-app/' on GitHub Pages */
 const BASE = import.meta.env.BASE_URL;
 
+// Prewarm list (add more if you have them)
+const CARD_URLS = [
+  'cards/card-back.webp', 'cards/card-nemesis.webp',
+  'cards/card-p1.webp','cards/card-p2.webp','cards/card-p3.webp',
+  'cards/card-p4.webp','cards/card-p5.webp','cards/card-p6.webp'
+].map(p => `${BASE}${p}`);
+
+async function warmCardsCache() {
+  try {
+    // Wait for SW so requests populate the runtime cache immediately
+    await navigator.serviceWorker?.ready;
+    // Fetch each once; 'reload' bypasses HTTP cache to ensure SW handles it
+    await Promise.all(
+      CARD_URLS.map(u => fetch(u, { cache: 'reload' }).catch(() => null))
+    );
+  } catch {
+    // fail-soft; app still works
+  }
+}
+
 /* ---------- helpers ---------- */
 
 function shuffle(array) {
@@ -86,6 +106,18 @@ export default function App() {
   const [topInstant, setTopInstant] = useState(false); // disable top transition briefly
   const [hideTop, setHideTop] = useState(false);       // hide top (first flip)
   const [shuffleFX, setShuffleFX] = useState(false);   // drives CSS jitter+fade
+
+  // NEW: Asset preloading gate
+  const [assetsReady, setAssetsReady] = useState(false);
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      await warmCardsCache();
+      if (alive) setAssetsReady(true);
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // Undo history
   const historyRef = useRef([]);
@@ -322,6 +354,18 @@ export default function App() {
   const remaining = state.deck.length;
 
   /* ---------- UI ---------- */
+
+  // EARLY RETURN: show loading screen until cache is ready
+  if (!assetsReady) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="text-lg font-semibold">Preparing deck…</div>
+          <div className="text-sm opacity-70">Caching images for offline play</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
