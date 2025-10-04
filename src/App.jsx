@@ -10,17 +10,33 @@ const CARD_URLS = [
   'cards/card-p4.webp','cards/card-p5.webp','cards/card-p6.webp'
 ].map(p => `${BASE}${p}`);
 
+/**
+ * Warm the cache quickly and robustly:
+ * - Try Cache Storage API (cache.addAll) so we don't depend on serviceWorker.ready
+ * - Cap the wait to MAX_WAIT_MS so UI never blocks too long on first run
+ * - Fallback to fetch() if addAll fails
+ * NOTE: cacheName should match your Workbox runtime cache for cards (cards-cache-v1)
+ */
 async function warmCardsCache() {
-  try {
-    // Wait for SW so requests populate the runtime cache immediately
-    await navigator.serviceWorker?.ready;
-    // Fetch each once; 'reload' bypasses HTTP cache to ensure SW handles it
-    await Promise.all(
-      CARD_URLS.map(u => fetch(u, { cache: 'reload' }).catch(() => null))
-    );
-  } catch {
-    // fail-soft; app still works
-  }
+  const urls = CARD_URLS;
+  const MAX_WAIT_MS = 4000;           // cap first-run wait
+  const cacheName = 'cards-cache-v1'; // must match workbox runtime cache name
+
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const cacheAddAll = (async () => {
+    try {
+      const cache = await caches.open(cacheName);
+      const requests = urls.map(u => new Request(u, { cache: 'reload' }));
+      await cache.addAll(requests);
+    } catch {
+      // If any addAll request fails (e.g., 404/network), fallback to fire-and-forget fetch
+      await Promise.all(urls.map(u => fetch(u, { cache: 'reload' }).catch(() => null)));
+    }
+  })();
+
+  // Bound how long we block the UI on first run.
+  await Promise.race([cacheAddAll, sleep(MAX_WAIT_MS)]);
 }
 
 /* ---------- helpers ---------- */
@@ -107,13 +123,16 @@ export default function App() {
   const [hideTop, setHideTop] = useState(false);       // hide top (first flip)
   const [shuffleFX, setShuffleFX] = useState(false);   // drives CSS jitter+fade
 
-  // NEW: Asset preloading gate
+  // NEW: Asset preloading gate (with slow indicator)
   const [assetsReady, setAssetsReady] = useState(false);
+  const [warmingSlow, setWarmingSlow] = useState(false);
 
   React.useEffect(() => {
     let alive = true;
     (async () => {
+      const slowTimer = setTimeout(() => { if (alive) setWarmingSlow(true); }, 2500);
       await warmCardsCache();
+      clearTimeout(slowTimer);
       if (alive) setAssetsReady(true);
     })();
     return () => { alive = false; };
@@ -355,13 +374,17 @@ export default function App() {
 
   /* ---------- UI ---------- */
 
-  // EARLY RETURN: show loading screen until cache is ready
+  // EARLY RETURN: show loading screen until cache is ready (max ~4s)
   if (!assetsReady) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
         <div className="text-center space-y-2">
-          <div className="text-lg font-semibold">Preparing deck…</div>
-          <div className="text-sm opacity-70">Caching images for offline play</div>
+          <div className="text-lg font-semibold">
+            {warmingSlow ? 'Almost there…' : 'Preparing deck…'}
+          </div>
+          <div className="text-sm opacity-70">
+            {warmingSlow ? 'Finishing setup' : 'Caching images for offline play'}
+          </div>
         </div>
       </div>
     );
